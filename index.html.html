@@ -1,0 +1,737 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Cadence Cycle Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one phone-width column, large iOS titles, grouped lists, fixed tab bar. Single dark look by choice. */
+:root{
+  --bg:#000; --surface:#1c1c1e; --surface2:#2c2c2e; --line:rgba(84,84,88,.5);
+  --fg:#fff; --fg2:rgba(235,235,245,.62); --fg3:rgba(235,235,245,.3); --tab-off:#8e8e93;
+  --period:#ff375f; --period-soft:rgba(255,55,95,.16);
+  --fertile:#64d2ff; --fertile-soft:rgba(100,210,255,.15);
+  --blue:#0a84ff; --green:#30d158; --red:#ff453a;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Inter",system-ui,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:17px/1.3 var(--sans);-webkit-font-smoothing:antialiased;
+  padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;text-align:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.app{max-width:480px;margin:0 auto;padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+.num{font-variant-numeric:tabular-nums}
+
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:18px 4px 14px}
+.eyebrow{font-size:13px;color:var(--fg2);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+h1{margin:2px 0 0;font-size:34px;line-height:1.1;font-weight:700;letter-spacing:-.02em}
+.add{width:34px;height:34px;border-radius:50%;background:var(--surface2);color:var(--period);display:grid;place-items:center;flex:none}
+.add svg{width:18px;height:18px}
+.demo{margin:0 0 16px;padding:10px 14px;border-radius:12px;background:rgba(10,132,255,.14);color:#8ec5ff;font-size:14px;line-height:1.35}
+.demo b{color:#fff;font-weight:600;margin-right:4px}
+
+.ring{position:relative;width:min(100%,264px);margin:6px auto 0;aspect-ratio:1}
+.ring svg{width:100%;height:100%;display:block}
+.trk{fill:none;stroke:var(--surface2);stroke-width:14}
+.seg-p,.seg-f{fill:none;stroke-width:14;stroke-linecap:round}
+.seg-p{stroke:var(--period)} .seg-f{stroke:var(--fertile)}
+.mk{fill:#fff;stroke:var(--bg);stroke-width:3}
+.ring-c{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring-c .k{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg2);font-weight:600}
+.ring-c .n{font-size:64px;font-weight:700;line-height:1.05;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.ring-c .p{font-size:15px;color:var(--fg2)}
+.next{text-align:center;margin:18px 0}
+.next b{display:block;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.next span{color:var(--fg2);font-size:15px}
+.btn{display:block;width:100%;height:50px;border-radius:14px;background:var(--period);color:#fff;font-weight:600;text-align:center;line-height:50px;margin-bottom:24px}
+.btn.sec{background:var(--surface2)}
+
+.sec-title{font-size:13px;color:var(--fg2);text-transform:uppercase;letter-spacing:.04em;padding:0 16px 6px}
+.group{background:var(--surface);border-radius:12px;overflow:hidden;margin-bottom:8px}
+.row{display:flex;align-items:center;gap:12px;min-height:46px;padding:10px 16px;position:relative;width:100%}
+.row+.row::before{content:"";position:absolute;top:0;left:16px;right:0;height:.5px;background:var(--line)}
+.row .grow{flex:1;min-width:0}
+.row .t{font-size:17px}
+.row .s{font-size:13px;color:var(--fg2);margin-top:1px}
+.row .lab{flex:1;min-width:0}
+.row .val{text-align:right;display:flex;flex-direction:column;align-items:flex-end}
+.row .val b{font-weight:500;font-variant-numeric:tabular-nums}
+.row .val small{font-size:13px;color:var(--fg2)}
+.row.danger{color:var(--red)}
+.row.link{color:var(--period)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.dot.p{background:var(--period)} .dot.f{background:var(--fertile)} .dot.o{border:2px solid var(--fertile)}
+.chev{width:8px;height:14px;color:var(--fg3);flex:none}
+.tag{font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--fg2);background:var(--surface2);border-radius:6px;padding:2px 6px}
+.len{color:var(--fg2);font-size:15px;font-variant-numeric:tabular-nums}
+.foot{font-size:13px;color:var(--fg2);padding:0 16px;margin:6px 0 24px;line-height:1.4}
+.ico{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;flex:none;color:#fff}
+.ico svg{width:18px;height:18px}
+.warn{margin:0 0 16px;padding:10px 14px;border-radius:12px;background:rgba(255,159,10,.14);color:#ffc266;font-size:14px}
+.empty{text-align:center;padding:36px 12px 24px}
+.empty .ring{opacity:.9}
+.empty h2{font-size:22px;margin:20px 0 6px}
+.empty p{color:var(--fg2);margin:0 auto 22px;max-width:30ch;font-size:15px}
+
+.mnav{display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px}
+.mnav h2{margin:0;font-size:20px;font-weight:700}
+.mnav .btns{display:flex;gap:4px;align-items:center}
+.mnav button{min-width:36px;height:36px;border-radius:18px;color:var(--period);display:grid;place-items:center;padding:0 8px;font-size:15px;font-weight:500}
+.mnav svg{width:10px;height:16px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);row-gap:4px;text-align:center;margin-bottom:16px}
+.wd{font-size:12px;color:var(--fg2);font-weight:600;padding:6px 0}
+.day{height:46px;display:grid;place-items:center;position:relative}
+.day span{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:17px;font-variant-numeric:tabular-nums;border:1.5px solid transparent}
+.day.blank{visibility:hidden}
+.day.c-fert span{background:var(--fertile-soft);color:var(--fertile)}
+.day.c-ovu span{background:var(--fertile-soft);color:var(--fertile);border-color:var(--fertile);font-weight:600}
+.day.c-pred span{border:1.5px dashed var(--period);color:var(--period)}
+.day.c-logged span{background:var(--period);color:#fff;font-weight:600}
+.day.c-today span{font-weight:700}
+.day.c-today::after{content:"";position:absolute;bottom:1px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:var(--fg2);padding:2px 4px 18px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.lg-l{background:var(--period)} .lg-p{border:1.5px dashed var(--period)} .lg-f{background:var(--fertile-soft);border:1px solid var(--fertile)} .lg-o{border:2px solid var(--fertile)}
+
+.chart{padding:14px 10px 6px}
+.chart svg{width:100%;height:auto;display:block}
+.chart .gl{stroke:var(--line);stroke-width:.5}
+.chart .ax{fill:var(--fg2);font-size:9px;font-family:var(--sans)}
+.chart .bv{fill:var(--fg2);font-size:10px;font-family:var(--sans);font-variant-numeric:tabular-nums}
+.chart .on{fill:var(--period)} .chart .off{fill:var(--surface2)}
+.chart .avg{stroke:var(--fg);stroke-width:1;stroke-dasharray:4 3;opacity:.7}
+.cap{font-size:12px;color:var(--fg2);padding:4px 6px 10px}
+
+.switch{width:51px;height:31px;border-radius:16px;background:#39393d;position:relative;flex:none;transition:background .2s}
+.switch i{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.3);transition:transform .2s}
+.switch[aria-checked="true"]{background:var(--green)}
+.switch[aria-checked="true"] i{transform:translateX(20px)}
+.stepper{display:flex;background:var(--surface2);border-radius:8px;overflow:hidden;flex:none}
+.stepper button{width:42px;height:32px;font-size:20px;display:grid;place-items:center;text-align:center}
+.stepper button+button{border-left:.5px solid var(--line)}
+.bar{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin:2px 16px 8px}
+.bar i{display:block;height:100%;background:var(--period);width:0}
+.pad{padding:0 16px 12px}
+
+input[type=date]{background:var(--surface2);color:var(--fg);border:0;border-radius:8px;padding:6px 10px;font:inherit;font-size:16px;min-height:34px}
+textarea{width:100%;min-height:150px;background:var(--surface2);color:var(--fg);border:0;border-radius:10px;padding:10px 12px;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;background:rgba(22,22,24,.82);
+  -webkit-backdrop-filter:saturate(1.8) blur(22px);backdrop-filter:saturate(1.8) blur(22px);border-top:.5px solid var(--line);
+  padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.tabs-in{display:flex;width:100%;max-width:480px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:500;color:var(--tab-off);padding:4px 0}
+.tab svg{width:26px;height:26px}
+.tab[aria-current="page"]{color:var(--period)}
+
+.backdrop{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;display:flex;justify-content:center;pointer-events:none}
+.sheet-in{width:100%;max-width:520px;max-height:90vh;overflow:auto;background:var(--bg);border-radius:14px 14px 0 0;transform:translateY(105%);transition:transform .32s cubic-bezier(.2,.8,.2,1);
+  padding:8px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));border-top:.5px solid var(--line)}
+.open .backdrop{opacity:1;pointer-events:auto}
+.open .sheet-in{transform:none;pointer-events:auto}
+.grab{width:36px;height:5px;border-radius:3px;background:var(--fg3);margin:0 auto 10px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
+.sheet-head h2{margin:0;font-size:17px;font-weight:600;text-align:center;flex:1}
+.sheet-head .l{color:var(--period);min-width:64px}
+.sheet-head .r{color:var(--period);font-weight:600;min-width:64px;text-align:right}
+.err{color:var(--red);font-size:14px;min-height:20px;margin:6px 4px 12px}
+.sheet p{color:var(--fg2);font-size:15px;margin:0 0 16px;line-height:1.4}
+.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);z-index:40;max-width:calc(100% - 32px);
+  background:#3a3a3c;color:#fff;font-size:15px;padding:10px 16px;border-radius:20px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app" id="root"></div>
+<nav class="tabs" aria-label="Sections"><div class="tabs-in">
+  <button class="tab" data-act="tab" data-tab="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>Today</button>
+  <button class="tab" data-act="tab" data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Calendar</button>
+  <button class="tab" data-act="tab" data-tab="hist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 20v-6M12 20V6M18 20v-9"/></svg>History</button>
+  <button class="tab" data-act="tab" data-tab="data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 19h14"/></svg>Data</button>
+</div></nav>
+<div id="sheet-root"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="file-health" accept=".zip,.xml,.json" hidden>
+<script>
+'use strict';
+// <pure>
+const DAY = 86400000;
+const pad = n => String(n).padStart(2, '0');
+function numOf(s) { const p = s.split('-'); return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / DAY); }
+function strOf(n) { const d = new Date(n * DAY); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+function todayN() { const d = new Date(); return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY); }
+function median(a) { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+
+const DEFAULTS = { cycleLen: 28, periodLen: 5, luteal: 14 };
+const BOUNDS = { cycleLen: [21, 45], periodLen: [2, 10], luteal: [10, 16] };
+
+/* Prediction model.
+   1. Use the last 12 cycle lengths, drop impossible ones (<15 or >60 days: usually a missed log).
+   2. With 4+ cycles, drop outliers further than max(6, 3 robust SDs) from the median.
+   3. Exponentially weighted mean (weight 0.88 per cycle of age), so recent cycles count more.
+   4. With fewer than 3 usable cycles, pull toward the default length.
+   5. Range = 1.28 weighted SD (about 80% of cycles), clamped to 1-7 days. */
+function fitModel(lens, def) {
+  let base = lens.map((x, i) => ({ x, i })).slice(-12).filter(o => o.x >= 15 && o.x <= 60);
+  if (base.length >= 4) {
+    const xs = base.map(o => o.x), m = median(xs), mad = median(xs.map(x => Math.abs(x - m)));
+    const lim = Math.max(6, 3 * 1.4826 * mad);
+    base = base.filter(o => Math.abs(o.x - m) <= lim);
+  }
+  const n = base.length, used = new Set(base.map(o => o.i));
+  if (!n) return { L: def, mean: null, sd: null, n: 0, conf: 'Low', window: 3, used };
+  let sw = 0, sm = 0;
+  base.forEach((o, k) => { o.w = Math.pow(0.88, n - 1 - k); sw += o.w; sm += o.w * o.x; });
+  const mean = sm / sw;
+  let sv = 0; base.forEach(o => { sv += o.w * (o.x - mean) * (o.x - mean); });
+  const sd = n > 1 ? Math.sqrt(sv / sw) : null;
+  const L = n < 3 ? (n * mean + def) / (n + 1) : mean;
+  const window = (n < 3 || sd === null) ? 3 : Math.min(7, Math.max(1, Math.ceil(1.28 * sd)));
+  let conf = 'Low';
+  if (n >= 6 && sd <= 2.5) conf = 'High'; else if (n >= 3 && sd <= 4.5) conf = 'Medium';
+  return { L, mean, sd, n, conf, window, used };
+}
+
+function analyze(state, T) {
+  const S = state.settings;
+  const cs = [...state.cycles].sort((a, b) => a.start < b.start ? -1 : a.start > b.start ? 1 : 0);
+  const starts = cs.map(c => numOf(c.start));
+  const lens = []; for (let i = 1; i < starts.length; i++) lens.push(starts[i] - starts[i - 1]);
+  const model = fitModel(lens, S.cycleLen);
+  const pl = cs.filter(c => c.end).map(c => numOf(c.end) - numOf(c.start) + 1).filter(x => x >= 1 && x <= 14).slice(-6);
+  let P = S.periodLen;
+  if (pl.length) { let sw = 0, sm = 0; pl.forEach((x, i) => { const w = Math.pow(0.88, pl.length - 1 - i); sw += w; sm += w * x; }); P = Math.round(sm / sw); }
+  const A = { cs, starts, lens, model, P, pObs: pl.length, T, S, last: cs[cs.length - 1] || null, next: [] };
+  if (A.last) {
+    const ls = starts[starts.length - 1];
+    for (let k = 1; k <= 7; k++) {
+      const st = ls + Math.round(model.L * k), ovu = st - S.luteal;
+      A.next.push({ start: st, end: st + P - 1, ovu, fStart: ovu - 5, fEnd: ovu + 1 });
+    }
+    A.ongoing = !A.last.end;
+    A.cycleDay = T - ls + 1;
+    const le = A.last.end ? numOf(A.last.end) : null;
+    A.inPeriod = A.ongoing ? T >= ls : (T >= ls && T <= le);
+    const n1 = A.next[0];
+    A.daysUntil = n1.start - T;
+    A.late = !A.ongoing && !A.inPeriod && T > n1.start;
+    if (A.inPeriod) A.phase = 'Period';
+    else if (T >= n1.fStart && T <= n1.fEnd) A.phase = T === n1.ovu ? 'Ovulation day' : 'Fertile window';
+    else if (T < n1.fStart) A.phase = 'Follicular phase';
+    else A.phase = A.late ? 'Period is late' : 'Luteal phase';
+  }
+  const errs = [];
+  for (let i = 2; i < lens.length; i++) errs.push(Math.abs(Math.round(fitModel(lens.slice(0, i), S.cycleLen).L) - lens[i]));
+  const e = errs.slice(-12);
+  A.acc = e.length >= 3 ? { mae: e.reduce((a, b) => a + b, 0) / e.length, n: e.length, within2: e.filter(x => x <= 2).length } : null;
+  return A;
+}
+
+/* Group Apple Health flow days into periods: days up to 3 apart belong to one period. */
+function groupDays(dayNums) {
+  const d = [...new Set(dayNums)].sort((a, b) => a - b), out = [];
+  d.forEach(n => {
+    const cur = out[out.length - 1];
+    if (cur && n - cur.end <= 3) cur.end = n; else out.push({ start: n, end: n });
+  });
+  return out;
+}
+function overlapsAny(p, cycles, T) {
+  return cycles.some(c => { const s = numOf(c.start), e = c.end ? numOf(c.end) : Math.max(s, T); return p.start <= e + 3 && p.end >= s - 3; });
+}
+function sampleCycles(T) {
+  const lens = [28, 30, 27, 29, 28, 31, 28, 29], pls = [5, 4, 5, 5, 6, 5, 4, 5, 5];
+  const starts = [T - 12];
+  for (let i = lens.length - 1; i >= 0; i--) starts.unshift(starts[0] - lens[i]);
+  return starts.map((s, i) => ({ id: 'sample' + i, start: strOf(s), end: strOf(s + pls[i] - 1), src: 'sample' }));
+}
+// </pure>
+
+/* ---------- state & storage ---------- */
+const KEY = 'cadence.cycles.v1', KEY_S = 'cadence.settings.v1';
+const $ = (s, r) => (r || document).querySelector(s);
+const root = $('#root'), sheetRoot = $('#sheet-root');
+const state = { cycles: [], settings: Object.assign({}, DEFAULTS), demo: false };
+const ui = { tab: 'today', month: 0, sheet: null, importing: null };
+let storageOK = true;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function cleanCycles(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(c => c && DATE_RE.test(c.start) && (c.end == null || (DATE_RE.test(c.end) && c.end >= c.start)))
+    .map(c => ({ id: c.id || uid(), start: c.start, end: c.end || null, src: c.src === 'health' ? 'health' : 'manual' }));
+}
+function cleanSettings(s) {
+  const out = Object.assign({}, DEFAULTS);
+  if (s && typeof s === 'object') for (const k in BOUNDS) { const v = Number(s[k]); if (v >= BOUNDS[k][0] && v <= BOUNDS[k][1]) out[k] = Math.round(v); }
+  return out;
+}
+function save() {
+  try {
+    localStorage.setItem(KEY_S, JSON.stringify(state.settings));
+    if (!state.demo) localStorage.setItem(KEY, JSON.stringify({ v: 1, cycles: state.cycles }));
+    storageOK = true;
+  } catch (e) { storageOK = false; }
+}
+function load() {
+  try {
+    const s = localStorage.getItem(KEY_S); if (s) state.settings = cleanSettings(JSON.parse(s));
+    const raw = localStorage.getItem(KEY);
+    if (raw !== null) { state.cycles = cleanCycles(JSON.parse(raw).cycles); state.demo = false; return; }
+  } catch (e) { storageOK = false; }
+  state.demo = true; state.cycles = sampleCycles(todayN());
+}
+function mutate(fn) {
+  if (state.demo) { state.cycles = []; state.demo = false; }
+  fn();
+  state.cycles.sort((a, b) => a.start < b.start ? -1 : 1);
+  save(); render();
+}
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ---------- formatting ---------- */
+function fmt(n, o) { return new Date(n * DAY).toLocaleDateString(undefined, Object.assign({ timeZone: 'UTC' }, o || { month: 'short', day: 'numeric' })); }
+const range = (a, b) => a === b ? fmt(a) : fmt(a) + ' – ' + fmt(b);
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+const CHEV = '<svg class="chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l6 6-6 6"/></svg>';
+const PLUS = '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 2v14M2 9h14"/></svg>';
+
+function head(title, eyebrow, add) {
+  return '<header class="head"><div><div class="eyebrow">' + esc(eyebrow || '') + '</div><h1>' + title + '</h1></div>' +
+    (add ? '<button class="add" data-act="openLog" aria-label="Log a period">' + PLUS + '</button>' : '') + '</header>';
+}
+const demoBanner = () => state.demo ? '<div class="demo"><b>Sample data.</b>Log a period or import from Apple Health to replace it.</div>' : '';
+
+/* ---------- Today ---------- */
+function polar(r, deg) { const a = deg * Math.PI / 180; return [120 + r * Math.cos(a), 120 + r * Math.sin(a)]; }
+function arc(r, a0, a1) {
+  const p0 = polar(r, a0), p1 = polar(r, a1);
+  return 'M' + p0[0].toFixed(2) + ' ' + p0[1].toFixed(2) + 'A' + r + ' ' + r + ' 0 ' + ((a1 - a0) > 180 ? 1 : 0) + ' 1 ' + p1[0].toFixed(2) + ' ' + p1[1].toFixed(2);
+}
+function seg(from, to, L, cls) {
+  from = Math.max(1, from); to = Math.min(L, to); if (from > to) return '';
+  const cap = 4.1; let a0 = -90 + 360 * (from - 1) / L + cap, a1 = -90 + 360 * to / L - cap;
+  if (a1 <= a0) { const m = (a0 + a1) / 2; a0 = m - 0.05; a1 = m + 0.05; }
+  return '<path class="' + cls + '" d="' + arc(100, a0, a1) + '"/>';
+}
+function ringSVG(A) {
+  const L = Math.max(Math.round(A.model.L), 21), n1 = A.next[0], ls = A.starts[A.starts.length - 1];
+  const pDays = A.last.end ? numOf(A.last.end) - ls + 1 : Math.max(A.P, A.cycleDay);
+  let s = '<circle class="trk" cx="120" cy="120" r="100"/>';
+  s += seg(1, pDays, L, 'seg-p') + seg(n1.fStart - ls + 1, n1.fEnd - ls + 1, L, 'seg-f');
+  const day = Math.min(Math.max(A.cycleDay, 1), L), m = polar(100, -90 + 360 * (day - 0.5) / L);
+  s += '<circle class="mk" cx="' + m[0].toFixed(2) + '" cy="' + m[1].toFixed(2) + '" r="9"/>';
+  return '<svg viewBox="0 0 240 240" role="img" aria-label="Cycle day ' + A.cycleDay + ', ' + esc(A.phase) + '">' + s + '</svg>';
+}
+function emptyState() {
+  return '<div class="empty"><div class="ring"><svg viewBox="0 0 240 240"><circle class="trk" cx="120" cy="120" r="100"/></svg>' +
+    '<div class="ring-c"><div class="k">Cycle day</div><div class="n">–</div></div></div>' +
+    '<h2>No cycles yet</h2><p>Log your last period or bring in your history from Apple Health to start predictions.</p>' +
+    '<button class="btn" data-act="openLog">Log a period</button><button class="btn sec" data-act="tab" data-tab="data">Import from Apple Health</button></div>';
+}
+function row(dot, label, val, sub) {
+  return '<div class="row">' + (dot ? '<span class="dot ' + dot + '"></span>' : '') + '<span class="lab">' + label + '</span><span class="val"><b>' + val + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span></div>';
+}
+function viewToday(A) {
+  const eyebrow = fmt(A.T, { weekday: 'long', day: 'numeric', month: 'long' });
+  if (!A.last) return head('Today', eyebrow) + emptyState();
+  const n1 = A.next[0], win = A.model.window, nf = A.next.find(n => n.fEnd >= A.T) || A.next[0];
+  let big, small;
+  if (A.ongoing) { big = 'Period day ' + A.cycleDay; small = 'Next one around ' + fmt(n1.start); }
+  else if (A.daysUntil > 1) { big = 'Next period in ' + A.daysUntil + ' days'; small = 'Expected ' + fmt(n1.start) + ' · ±' + win + ' days'; }
+  else if (A.daysUntil === 1) { big = 'Next period tomorrow'; small = 'Expected ' + fmt(n1.start) + ' · ±' + win + ' days'; }
+  else if (A.daysUntil === 0) { big = 'Period expected today'; small = '±' + win + ' days'; }
+  else { big = 'Period is ' + plural(-A.daysUntil, 'day') + ' late'; small = 'Was expected ' + fmt(n1.start); }
+  const avg = A.model.mean !== null ? A.model.mean.toFixed(1) : A.S.cycleLen;
+  let h = head('Today', eyebrow) + demoBanner();
+  h += '<div class="ring">' + ringSVG(A) + '<div class="ring-c"><div class="k">Cycle day</div><div class="n">' + A.cycleDay + '</div><div class="p">' + esc(A.phase) + '</div></div></div>';
+  h += '<div class="next"><b>' + big + '</b><span>' + small + '</span></div>';
+  h += A.ongoing ? '<button class="btn" data-act="endPeriod">End period today</button>' : '<button class="btn" data-act="openLog">Log period</button>';
+  h += '<div class="sec-title">Forecast</div><div class="group">' +
+    row('p', 'Next period', range(n1.start, n1.end), '±' + win + ' days') +
+    row('f', 'Fertile window', range(nf.fStart, nf.fEnd), 'estimate') +
+    row('o', 'Ovulation', fmt(nf.ovu), 'estimate') + '</div>';
+  h += '<div class="sec-title" style="margin-top:20px">Your averages</div><div class="group">' +
+    row('', 'Cycle length', avg + ' days', A.model.n ? 'last ' + plural(A.model.n, 'cycle') : 'default') +
+    row('', 'Period length', A.P + ' days', A.pObs ? 'last ' + plural(A.pObs, 'period') : 'default') +
+    row('', 'Confidence', A.model.conf, A.model.n >= 3 ? 'from ' + A.model.n + ' cycles' : 'log more cycles') + '</div>';
+  h += '<p class="foot">Predictions are estimates from your own logs. They are not medical advice and not a form of birth control.</p>';
+  return h;
+}
+
+/* ---------- Calendar ---------- */
+function dayMaps(A) {
+  const M = { logged: new Set(), pred: new Set(), fert: new Set(), ovu: new Set() };
+  A.cs.forEach(c => { const s = numOf(c.start), e = c.end ? numOf(c.end) : Math.min(A.T, s + 13); for (let d = s; d <= e; d++) M.logged.add(d); });
+  if (A.last) A.next.slice(0, 6).forEach(n => {
+    for (let d = n.start; d <= n.end; d++) M.pred.add(d);
+    for (let d = n.fStart; d <= n.fEnd; d++) M.fert.add(d);
+    M.ovu.add(n.ovu);
+  });
+  return M;
+}
+function viewCal(A) {
+  const first = new Date(ui.month * DAY), y = first.getUTCFullYear(), m = first.getUTCMonth();
+  const dow = first.getUTCDay(), dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(), M = dayMaps(A);
+  let cells = '';
+  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(w => cells += '<div class="wd" aria-hidden="true">' + w + '</div>');
+  for (let i = 0; i < dow; i++) cells += '<div class="day blank"></div>';
+  for (let d = 1; d <= dim; d++) {
+    const n = ui.month + d - 1; let cls = 'day';
+    if (M.logged.has(n)) cls += ' c-logged'; else if (M.ovu.has(n)) cls += ' c-ovu'; else if (M.pred.has(n)) cls += ' c-pred'; else if (M.fert.has(n)) cls += ' c-fert';
+    if (n === A.T) cls += ' c-today';
+    cells += '<button class="' + cls + '" data-act="day" data-n="' + n + '" aria-label="' + esc(fmt(n, { weekday: 'long', day: 'numeric', month: 'long' })) + '"><span>' + d + '</span></button>';
+  }
+  const title = fmt(ui.month, { month: 'long', year: 'numeric' });
+  let h = head('Calendar', '', true) + demoBanner();
+  h += '<div class="mnav"><h2>' + title + '</h2><div class="btns"><button data-act="monthPrev" aria-label="Previous month"><svg viewBox="0 0 10 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L2 8l6 7"/></svg></button>' +
+    '<button data-act="monthNow">Today</button><button data-act="monthNext" aria-label="Next month"><svg viewBox="0 0 10 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 1l6 7-6 7"/></svg></button></div></div>';
+  h += '<div class="cal">' + cells + '</div>';
+  h += '<div class="legend"><span><i class="lg-l"></i>Period</span><span><i class="lg-p"></i>Predicted</span><span><i class="lg-f"></i>Fertile (est.)</span><span><i class="lg-o"></i>Ovulation (est.)</span></div>';
+  if (A.last) {
+    h += '<div class="sec-title">Coming up</div><div class="group">';
+    A.next.slice(0, 3).forEach(n => {
+      const d = n.start - A.T;
+      h += row('p', range(n.start, n.end), d > 0 ? 'in ' + plural(d, 'day') : d === 0 ? 'today' : plural(-d, 'day') + ' ago', '±' + A.model.window + ' days');
+    });
+    h += '</div>';
+  }
+  return h;
+}
+
+/* ---------- History ---------- */
+function chartSVG(A) {
+  const items = A.lens.map((x, i) => ({ x, i, s: A.starts[i] })).slice(-12);
+  if (items.length < 2) return '';
+  const W = 340, H = 170, pl = 28, pr = 8, pt = 18, pb = 26;
+  const ymax = Math.ceil((Math.max(...items.map(o => o.x), A.model.L) + 3) / 10) * 10;
+  const y = v => pt + (H - pt - pb) * (1 - v / ymax);
+  const iw = (W - pl - pr) / items.length, bw = Math.min(22, iw * 0.62);
+  let s = '';
+  for (let v = 0; v <= ymax; v += 10) s += '<line class="gl" x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="ax" x="' + (pl - 6) + '" y="' + (y(v) + 3) + '" text-anchor="end">' + v + '</text>';
+  items.forEach((o, k) => {
+    const x = pl + iw * k + (iw - bw) / 2, cx = x + bw / 2, on = A.model.used.has(o.i);
+    s += '<rect class="' + (on ? 'on' : 'off') + '" x="' + x.toFixed(1) + '" y="' + y(o.x).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (y(0) - y(o.x)).toFixed(1) + '" rx="4"/>';
+    s += '<text class="bv" x="' + cx.toFixed(1) + '" y="' + (y(o.x) - 4).toFixed(1) + '" text-anchor="middle">' + o.x + '</text>';
+    if (items.length <= 8 || k % 2 === 0) s += '<text class="ax" x="' + cx.toFixed(1) + '" y="' + (H - 9) + '" text-anchor="middle">' + fmt(o.s, { month: 'short' }) + '</text>';
+  });
+  const my = y(A.model.mean !== null ? A.model.mean : A.model.L);
+  s += '<line class="avg" x1="' + pl + '" x2="' + (W - pr) + '" y1="' + my.toFixed(1) + '" y2="' + my.toFixed(1) + '"/>';
+  return '<div class="sec-title">Cycle length</div><div class="group chart"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Bar chart of recent cycle lengths in days">' + s + '</svg>' +
+    '<div class="cap">Days from one period start to the next. Dashed line is your weighted average. Grey bars are left out as outliers.</div></div>';
+}
+function viewHist(A) {
+  let h = head('History', 'Your cycles', true) + demoBanner();
+  if (!A.cs.length) return h + emptyState();
+  h += '<div class="sec-title">Summary</div><div class="group">' +
+    row('', 'Average cycle', (A.model.mean !== null ? A.model.mean.toFixed(1) : A.S.cycleLen) + ' days') +
+    row('', 'Average period', A.P + ' days') +
+    (A.lens.length ? row('', 'Shortest – longest', Math.min(...A.lens) + ' – ' + Math.max(...A.lens) + ' days') : '') +
+    (A.acc ? row('', 'Forecast accuracy', '±' + A.acc.mae.toFixed(1) + ' days', A.acc.within2 + ' of ' + A.acc.n + ' within 2 days') : '') + '</div>';
+  h += '<div style="height:16px"></div>' + chartSVG(A);
+  const byYear = {};
+  [...A.cs].reverse().forEach(c => { const i = A.cs.indexOf(c), y = c.start.slice(0, 4); (byYear[y] = byYear[y] || []).push({ c, i }); });
+  Object.keys(byYear).sort().reverse().forEach(y => {
+    h += '<div class="sec-title" style="margin-top:16px">' + y + '</div><div class="group">';
+    byYear[y].forEach(o => {
+      const c = o.c, s = numOf(c.start), e = c.end ? numOf(c.end) : null, next = A.starts[o.i + 1];
+      const sub = e === null ? 'Ongoing · day ' + (A.T - s + 1) : plural(e - s + 1, 'day');
+      h += '<button class="row" data-act="editCycle" data-id="' + esc(c.id) + '"><div class="grow"><div class="t">' + range(s, e === null ? s : e) + '</div><div class="s">' + sub + '</div></div>' +
+        (c.src === 'health' ? '<span class="tag">Health</span>' : '') + '<span class="len">' + (next ? (next - s) + ' d' : 'Current') + '</span>' + CHEV + '</button>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+
+/* ---------- Data ---------- */
+function ico(bg, svg) { return '<span class="ico" style="background:' + bg + '">' + svg + '</span>'; }
+function stepRow(label, k, unit) {
+  return '<div class="row"><span class="lab">' + label + '</span><span class="len" style="margin-right:4px">' + state.settings[k] + ' ' + unit + '</span><span class="stepper">' +
+    '<button data-act="step" data-k="' + k + '" data-d="-1" aria-label="Decrease ' + esc(label) + '">−</button><button data-act="step" data-k="' + k + '" data-d="1" aria-label="Increase ' + esc(label) + '">+</button></span></div>';
+}
+function viewData() {
+  const heart = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5.5 6.2 5.5c2 0 3.3 1.1 3.8 2 .5-.9 1.8-2 3.8-2 3.2 0 5 3.1 3.7 6.3C19.5 16.4 12 21 12 21z"/></svg>';
+  const doc = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15V4m0 0L8 8m4-4l4 4M5 14v5h14v-5"/></svg>';
+  const back = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg>';
+  const bin = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
+  const im = ui.importing;
+  let h = head('Data', 'Import and settings') + demoBanner();
+  if (!storageOK) h += '<div class="warn">This browser blocked storage, so changes will be lost when you close the page.</div>';
+  h += '<div class="sec-title">Apple Health</div><div class="group"><button class="row" data-act="pickHealth">' + ico('var(--period)', heart) +
+    '<div class="grow"><div class="t">Import from Apple Health</div><div class="s">Choose export.zip or export.xml</div></div>' + CHEV + '</button>' +
+    (im ? '<div class="bar"><i id="imp-fill" style="width:' + im.pct + '%"></i></div><div class="s pad num" style="font-size:13px;color:var(--fg2)">Reading ' + esc(im.name) + ' · <span id="imp-pct">' + im.pct + '%</span></div>' : '') + '</div>';
+  h += '<p class="foot">On your iPhone open Health, tap your profile picture, then Export All Health Data. Save the file to Files and choose it here. It is read on this device and never uploaded.</p>';
+  h += '<div class="sec-title">Predictions</div><div class="group">' + stepRow('Default cycle', 'cycleLen', 'days') + stepRow('Default period', 'periodLen', 'days') + stepRow('Luteal phase', 'luteal', 'days') + '</div>';
+  h += '<p class="foot">Defaults are used until you have a few logged cycles. Ovulation is estimated as the luteal phase before your next period, and the fertile window runs from 5 days before ovulation to 1 day after.</p>';
+  h += '<div class="sec-title">Backup</div><div class="group">' +
+    '<button class="row" data-act="openBackup">' + ico('var(--blue)', doc) + '<span class="lab">Back up as text</span>' + CHEV + '</button>' +
+    '<button class="row" data-act="openRestore">' + ico('#5e5ce6', back) + '<span class="lab">Restore from backup</span>' + CHEV + '</button>' +
+    '<button class="row danger" data-act="openErase">' + ico('var(--red)', bin) + '<span class="lab">Erase all data</span></button></div>';
+  h += '<p class="foot">Everything is stored in this browser on this device. Back up now and then, especially before clearing site data.</p>';
+  return h;
+}
+
+function render() {
+  const A = analyze(state, todayN());
+  root.innerHTML = ({ today: viewToday, cal: viewCal, hist: viewHist, data: viewData })[ui.tab](A);
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-current', t.dataset.tab === ui.tab ? 'page' : 'false'));
+}
+
+/* ---------- sheets ---------- */
+function sw(on) { return '<button class="switch" role="switch" aria-checked="' + on + '" data-act="toggleOngoing" aria-label="Still ongoing"><i></i></button>'; }
+function sheetHTML(s) {
+  const head = (l, title, r, ra, la) => '<div class="sheet-head"><button class="l" data-act="' + (la || 'sheetClose') + '">' + l + '</button><h2>' + title + '</h2>' +
+    (r ? '<button class="r" data-act="' + ra + '">' + r + '</button>' : '<span style="min-width:64px"></span>') + '</div>';
+  const T = todayN();
+  if (s.type === 'log') {
+    return head('Cancel', s.id ? 'Edit period' : 'Log period', 'Save', 'saveLog') +
+      '<div class="group"><label class="row" for="f-start"><span class="lab">Starts</span><input type="date" id="f-start" value="' + esc(s.start) + '" max="' + strOf(T) + '"></label>' +
+      '<div class="row"><span class="lab">Still ongoing</span>' + sw(s.ongoing) + '</div>' +
+      (s.ongoing ? '' : '<label class="row" for="f-end"><span class="lab">Ends</span><input type="date" id="f-end" value="' + esc(s.end || '') + '" max="' + strOf(T) + '"></label>') + '</div>' +
+      '<div class="err" id="f-err" role="alert"></div>' +
+      (s.id ? '<div class="group"><button class="row danger" data-act="deleteLog">Delete period</button></div>' : '');
+  }
+  if (s.type === 'import') {
+    const p = s.periods, fresh = s.fresh.length;
+    if (!p.length) return head('Close', 'Apple Health', '', '') + '<p>No menstrual flow entries were found in this file. Check that Cycle Tracking data was included in the export.</p>';
+    return head('Cancel', 'Import', '', '') + '<div class="group">' +
+      row('', 'Periods found', p.length, 'from ' + s.records + ' flow entries') +
+      row('', 'Date range', fmt(p[0].start, { month: 'short', year: 'numeric' }) + ' – ' + fmt(p[p.length - 1].end, { month: 'short', year: 'numeric' })) +
+      row('', 'New to your log', fresh, p.length - fresh ? (p.length - fresh) + ' already logged' : '') + '</div>' +
+      (fresh ? '<button class="btn" data-act="commitImport">Import ' + plural(fresh, 'period') + '</button>' : '<p>Everything in this file is already in your log.</p>');
+  }
+  if (s.type === 'backup') {
+    return head('Close', 'Back up', 'Copy', 'copyBackup') + '<p>Copy this text and keep it somewhere safe, such as Notes. Use Restore to bring it back.</p><textarea id="b-text" readonly>' + esc(s.text) + '</textarea>';
+  }
+  if (s.type === 'restore') {
+    return head('Cancel', 'Restore', 'Restore', 'doRestore') + '<p>Paste a backup. This replaces everything currently in the app.</p><textarea id="r-text" placeholder="Paste backup text here">' + esc(s.text || '') + '</textarea><div class="err" id="r-err" role="alert"></div>';
+  }
+  if (s.type === 'erase') {
+    return head('Cancel', 'Erase all data', '', '') + '<p>This removes every logged period and resets your settings on this device. It can\'t be undone.</p><button class="btn" style="background:var(--red)" data-act="doErase">Erase everything</button>';
+  }
+  return '';
+}
+function openSheet(s) {
+  ui.sheet = s;
+  sheetRoot.innerHTML = '<div class="backdrop" data-act="sheetClose"></div><div class="sheet"><div class="sheet-in" role="dialog" aria-modal="true"><div class="grab"></div>' + sheetHTML(s) + '</div></div>';
+  requestAnimationFrame(() => requestAnimationFrame(() => sheetRoot.classList.add('open')));
+}
+function closeSheet() {
+  ui.sheet = null; sheetRoot.classList.remove('open');
+  setTimeout(() => { if (!ui.sheet) sheetRoot.innerHTML = ''; }, 320);
+}
+function redrawSheet() { const el = $('.sheet-in', sheetRoot); if (el && ui.sheet) el.innerHTML = '<div class="grab"></div>' + sheetHTML(ui.sheet); }
+
+function openLog(o) {
+  o = o || {}; const T = todayN(), A = analyze(state, T);
+  if (o.id) {
+    const c = state.cycles.find(c => c.id === o.id); if (!c) return;
+    return openSheet({ type: 'log', id: c.id, start: c.start, end: c.end || '', ongoing: !c.end });
+  }
+  const s = o.start != null ? o.start : T, e = s + (A.last ? A.P : state.settings.periodLen) - 1;
+  const ongoing = e >= T;
+  openSheet({ type: 'log', id: null, start: strOf(s), end: ongoing ? '' : strOf(e), ongoing });
+}
+function saveLog() {
+  const s = ui.sheet, T = todayN(), err = m => { $('#f-err').textContent = m; };
+  if (!s.start) return err('Choose a start date.');
+  const sN = numOf(s.start); if (sN > T) return err('The start date can\'t be in the future.');
+  let eN = null;
+  if (!s.ongoing) {
+    if (!s.end) return err('Choose an end date, or turn on Still ongoing.');
+    eN = numOf(s.end);
+    if (eN < sN) return err('The end date is before the start date.');
+    if (eN > T) return err('The end date can\'t be in the future.');
+    if (eN - sN > 20) return err('A period can\'t last more than 21 days.');
+  }
+  const ne = eN === null ? Math.max(sN, T) : eN;
+  if (!state.demo) for (const c of state.cycles) {
+    if (c.id === s.id) continue;
+    const os = numOf(c.start), oe = c.end ? numOf(c.end) : Math.max(os, T);
+    if (sN <= oe && ne >= os) return err('This overlaps your period from ' + range(os, oe) + '.');
+  }
+  mutate(() => {
+    if (s.id) { const c = state.cycles.find(c => c.id === s.id); c.start = s.start; c.end = eN === null ? null : s.end; }
+    else state.cycles.push({ id: uid(), start: s.start, end: eN === null ? null : s.end, src: 'manual' });
+  });
+  closeSheet(); toast('Period saved');
+}
+
+/* ---------- Apple Health import ---------- */
+async function openZip(file) {
+  const tl = Math.min(file.size, 65557 + 22 + 20);
+  const tail = new DataView(await file.slice(file.size - tl).arrayBuffer());
+  let e = -1; for (let i = tl - 22; i >= 0; i--) if (tail.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('This does not look like a zip file.');
+  let cdSize = tail.getUint32(e + 12, true), cdOff = tail.getUint32(e + 16, true);
+  if (cdOff === 0xFFFFFFFF || cdSize === 0xFFFFFFFF) {
+    const l = e - 20;
+    if (l < 0 || tail.getUint32(l, true) !== 0x07064b50) throw new Error('Unsupported zip layout.');
+    const off = Number(tail.getBigUint64(l + 8, true));
+    const z = new DataView(await file.slice(off, off + 56).arrayBuffer());
+    if (z.getUint32(0, true) !== 0x06064b50) throw new Error('Unsupported zip layout.');
+    cdSize = Number(z.getBigUint64(40, true)); cdOff = Number(z.getBigUint64(48, true));
+  }
+  const cd = new DataView(await file.slice(cdOff, cdOff + cdSize).arrayBuffer()), td = new TextDecoder();
+  let p = 0, found = null;
+  while (p + 46 <= cd.byteLength && cd.getUint32(p, true) === 0x02014b50) {
+    const method = cd.getUint16(p + 10, true);
+    let csize = cd.getUint32(p + 20, true), usize = cd.getUint32(p + 24, true), loff = cd.getUint32(p + 42, true);
+    const nl = cd.getUint16(p + 28, true), el = cd.getUint16(p + 30, true), cl = cd.getUint16(p + 32, true);
+    const name = td.decode(new Uint8Array(cd.buffer, p + 46, nl));
+    if (/(^|\/)export\.xml$/i.test(name)) {
+      let q = p + 46 + nl; const end = q + el;
+      while (q + 4 <= end) {
+        const id = cd.getUint16(q, true), sz = cd.getUint16(q + 2, true);
+        if (id === 1) { let r = q + 4;
+          if (usize === 0xFFFFFFFF) { usize = Number(cd.getBigUint64(r, true)); r += 8; }
+          if (csize === 0xFFFFFFFF) { csize = Number(cd.getBigUint64(r, true)); r += 8; }
+          if (loff === 0xFFFFFFFF) { loff = Number(cd.getBigUint64(r, true)); r += 8; } }
+        q += 4 + sz;
+      }
+      found = { method, csize, usize, loff }; break;
+    }
+    p += 46 + nl + el + cl;
+  }
+  if (!found) throw new Error('export.xml was not found in this zip.');
+  const lh = new DataView(await file.slice(found.loff, found.loff + 30).arrayBuffer());
+  if (lh.getUint32(0, true) !== 0x04034b50) throw new Error('The zip file looks damaged.');
+  const start = found.loff + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+  let s = file.slice(start, start + found.csize).stream();
+  if (found.method === 8) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('This browser can\'t unzip files. Unzip export.zip in Files and choose export.xml instead.');
+    s = s.pipeThrough(new DecompressionStream('deflate-raw'));
+  } else if (found.method !== 0) throw new Error('Unsupported zip compression.');
+  return { stream: s, total: found.usize };
+}
+async function scanHealth(stream, total) {
+  const reader = stream.getReader(), dec = new TextDecoder(), days = new Set();
+  const re = /<Record\b[^>]*HKCategoryTypeIdentifierMenstrualFlow[^>]*>/g;
+  let buf = '', bytes = 0, records = 0, it = 0;
+  for (;;) {
+    const r = await reader.read(); if (r.done) break;
+    bytes += r.value.length; buf += dec.decode(r.value, { stream: true });
+    re.lastIndex = 0; let m, lastEnd = 0;
+    while ((m = re.exec(buf))) {
+      lastEnd = re.lastIndex;
+      const v = /\bvalue="([^"]*)"/.exec(m[0]), d = /\bstartDate="(\d{4}-\d{2}-\d{2})/.exec(m[0]);
+      if (d && !(v && /None/.test(v[1]))) { days.add(numOf(d[1])); records++; }
+    }
+    const cut = buf.lastIndexOf('<Record ');
+    buf = (cut >= 0 && cut >= lastEnd) ? buf.slice(cut) : buf.slice(-16);
+    if (++it % 40 === 0) {
+      const pct = total ? Math.min(99, Math.round(bytes / total * 100)) : 0;
+      if (ui.importing) ui.importing.pct = pct;
+      const f = $('#imp-fill'), t = $('#imp-pct'); if (f) f.style.width = pct + '%'; if (t) t.textContent = pct + '%';
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+  return { days: [...days], records };
+}
+async function handleFile(file) {
+  if (!file) return;
+  const name = file.name.toLowerCase();
+  try {
+    if (name.endsWith('.json')) return openSheet({ type: 'restore', text: await file.text() });
+    let src;
+    if (name.endsWith('.zip')) src = await openZip(file);
+    else if (name.endsWith('.xml')) src = { stream: file.stream(), total: file.size };
+    else throw new Error('Choose export.zip or export.xml from your Apple Health export.');
+    ui.importing = { pct: 0, name: file.name }; ui.tab = 'data'; render();
+    const res = await scanHealth(src.stream, src.total);
+    ui.importing = null; render();
+    const T = todayN(), periods = groupDays(res.days);
+    const fresh = periods.filter(p => state.demo || !overlapsAny(p, state.cycles, T));
+    openSheet({ type: 'import', periods, fresh, records: res.records });
+  } catch (err) {
+    ui.importing = null; render(); toast(err.message || 'Could not read that file.');
+  }
+}
+
+/* ---------- backup / restore ---------- */
+function backupText() {
+  return JSON.stringify({ app: 'cadence', v: 1, exported: strOf(todayN()), settings: state.settings,
+    cycles: state.cycles.map(c => ({ start: c.start, end: c.end, src: c.src })) });
+}
+function doRestore() {
+  const err = m => { $('#r-err').textContent = m; };
+  let d; try { d = JSON.parse($('#r-text').value); } catch (e) { return err('That text is not a valid backup.'); }
+  const cycles = cleanCycles(Array.isArray(d) ? d : d && d.cycles);
+  if (!cycles.length) return err('No periods were found in that backup.');
+  state.demo = false; state.cycles = cycles.sort((a, b) => a.start < b.start ? -1 : 1);
+  if (d && d.settings) state.settings = cleanSettings(d.settings);
+  save(); closeSheet(); render(); toast('Restored ' + plural(cycles.length, 'period'));
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-act]'); if (!t) return;
+  const a = t.dataset.act, T = todayN();
+  switch (a) {
+    case 'tab': ui.tab = t.dataset.tab; render(); window.scrollTo(0, 0); break;
+    case 'openLog': openLog(); break;
+    case 'endPeriod': {
+      const c = state.cycles[state.cycles.length - 1];
+      if (c && !c.end && numOf(c.start) <= T) { mutate(() => { c.end = strOf(T); }); toast('Period ended'); }
+      break; }
+    case 'editCycle':
+      if (state.demo) toast('Sample data. Log or import your own first.'); else openLog({ id: t.dataset.id });
+      break;
+    case 'day': {
+      const n = +t.dataset.n;
+      if (n > T) { const M = dayMaps(analyze(state, T)); toast(M.pred.has(n) ? 'Predicted period' : M.ovu.has(n) ? 'Estimated ovulation' : M.fert.has(n) ? 'Estimated fertile window' : fmt(n, { weekday: 'long', day: 'numeric', month: 'long' })); break; }
+      const hit = state.demo ? null : state.cycles.find(c => { const s = numOf(c.start), e = c.end ? numOf(c.end) : T; return n >= s && n <= e; });
+      if (hit) openLog({ id: hit.id }); else openLog({ start: n });
+      break; }
+    case 'monthPrev': case 'monthNext': {
+      const d = new Date(ui.month * DAY); ui.month = Math.round(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + (a === 'monthNext' ? 1 : -1), 1) / DAY); render(); break; }
+    case 'monthNow': { const d = new Date(); ui.month = Math.round(Date.UTC(d.getFullYear(), d.getMonth(), 1) / DAY); render(); break; }
+    case 'sheetClose': closeSheet(); break;
+    case 'toggleOngoing': ui.sheet.ongoing = !ui.sheet.ongoing; if (!ui.sheet.ongoing && !ui.sheet.end) ui.sheet.end = ui.sheet.start; redrawSheet(); break;
+    case 'saveLog': saveLog(); break;
+    case 'deleteLog': { const id = ui.sheet.id; mutate(() => { state.cycles = state.cycles.filter(c => c.id !== id); }); closeSheet(); toast('Period deleted'); break; }
+    case 'pickHealth': { const f = $('#file-health'); f.value = ''; f.click(); break; }
+    case 'commitImport': {
+      const fresh = ui.sheet.fresh;
+      mutate(() => { fresh.forEach(p => state.cycles.push({ id: uid(), start: strOf(p.start), end: strOf(p.end), src: 'health' })); });
+      closeSheet(); ui.tab = 'hist'; render(); window.scrollTo(0, 0); toast('Imported ' + plural(fresh.length, 'period')); break; }
+    case 'step': {
+      const k = t.dataset.k, v = state.settings[k] + (+t.dataset.d);
+      if (v >= BOUNDS[k][0] && v <= BOUNDS[k][1]) { state.settings[k] = v; save(); render(); } break; }
+    case 'openBackup': openSheet({ type: 'backup', text: backupText() }); break;
+    case 'copyBackup': {
+      const ta = $('#b-text'); ta.focus(); ta.select();
+      const fallback = () => { try { document.execCommand('copy'); toast('Backup copied'); } catch (e) { toast('Select the text and copy it'); } };
+      try { navigator.clipboard.writeText(ta.value).then(() => toast('Backup copied'), fallback); } catch (e) { fallback(); }
+      break; }
+    case 'openRestore': openSheet({ type: 'restore', text: '' }); break;
+    case 'doRestore': doRestore(); break;
+    case 'openErase': openSheet({ type: 'erase' }); break;
+    case 'doErase':
+      state.cycles = []; state.demo = false; state.settings = Object.assign({}, DEFAULTS); save(); closeSheet(); render(); toast('All data erased'); break;
+  }
+});
+document.addEventListener('input', ev => {
+  const s = ui.sheet; if (!s || s.type !== 'log') return;
+  if (ev.target.id === 'f-start') s.start = ev.target.value;
+  if (ev.target.id === 'f-end') s.end = ev.target.value;
+});
+$('#file-health').addEventListener('change', ev => handleFile(ev.target.files[0]));
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && ui.sheet) closeSheet(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !ui.sheet) render(); });
+
+load();
+{ const d = new Date(); ui.month = Math.round(Date.UTC(d.getFullYear(), d.getMonth(), 1) / DAY); }
+render();
+</script>
+
+</body></html>
